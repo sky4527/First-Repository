@@ -4,7 +4,6 @@ import org.example.model.ItemSet;
 import org.example.algorithm.DKnapsackDP;
 import org.example.util.DataLoader;
 import org.example.util.ChartGenerator;
-import com.formdev.flatlaf.FlatLightLaf;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -16,13 +15,13 @@ import java.util.List;
  * 主界面类
  * 提供用户交互界面，包含文件选择、数据展示、求解、导出等功能
  *
- * @author [曹微婕]
+ * @author 曹微婕
  */
 public class MainFrame extends JFrame {
 
-    private List<ItemSet> itemSets;           // 当前项集数据
-    private int capacity = 100;               // 背包容量
-    private DKnapsackDP.Result currentResult; // 当前求解结果
+    private List<ItemSet> itemSets;
+    private int capacity = 100;
+    private DKnapsackDP.Result currentResult;
 
     private JTable table;
     private DefaultTableModel tableModel;
@@ -41,27 +40,28 @@ public class MainFrame extends JFrame {
         setSize(1300, 800);
         setLocationRelativeTo(null);
 
-        // 主布局
         JPanel mainPanel = new JPanel(new BorderLayout(5, 5));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // 顶部工具栏
         JToolBar toolbar = createToolbar();
 
-        // 状态栏
+        JSplitPane splitPane = createSplitPane();
+
+        // 底部：求解结果面板
+        JPanel bottomPanel = createBottomPanel();
+
+        // 底部状态栏
         lblFileStatus = new JLabel("未加载数据文件");
         lblFileStatus.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
 
-        // 中央区域：左边表格，右边图表
-        JSplitPane splitPane = createSplitPane();
-
-        // 底部结果区域
-        JPanel bottomPanel = createBottomPanel();
+        // 将底部面板和状态栏合并到南侧
+        JPanel southContainer = new JPanel(new BorderLayout());
+        southContainer.add(bottomPanel, BorderLayout.CENTER);
+        southContainer.add(lblFileStatus, BorderLayout.SOUTH);
 
         mainPanel.add(toolbar, BorderLayout.NORTH);
         mainPanel.add(splitPane, BorderLayout.CENTER);
-        mainPanel.add(bottomPanel, BorderLayout.SOUTH);
-        mainPanel.add(lblFileStatus, BorderLayout.SOUTH);
+        mainPanel.add(southContainer, BorderLayout.SOUTH);
 
         add(mainPanel);
     }
@@ -99,7 +99,6 @@ public class MainFrame extends JFrame {
     }
 
     private JSplitPane createSplitPane() {
-        // 左边表格
         String[] columns = {"项集ID", "重量1", "价值1", "重量2", "价值2", "重量3", "价值3", "价值/重量比"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
@@ -114,28 +113,25 @@ public class MainFrame extends JFrame {
         tableScroll.setPreferredSize(new Dimension(500, 0));
         tableScroll.setBorder(BorderFactory.createTitledBorder("项集数据"));
 
-        // 右边图表区域
         chartPanel = new JPanel(new BorderLayout());
         chartPanel.setBorder(BorderFactory.createTitledBorder("价值-重量散点图"));
         chartPanel.add(new JLabel("请打开数据文件生成图表", SwingConstants.CENTER), BorderLayout.CENTER);
 
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, tableScroll, chartPanel);
         splitPane.setDividerLocation(550);
-
         return splitPane;
     }
 
     private JPanel createBottomPanel() {
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.setBorder(BorderFactory.createTitledBorder("求解结果"));
+        bottomPanel.setPreferredSize(new Dimension(0, 180));
 
         resultArea = new JTextArea(8, 0);
         resultArea.setEditable(false);
         resultArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
         JScrollPane resultScroll = new JScrollPane(resultArea);
-
         bottomPanel.add(resultScroll, BorderLayout.CENTER);
-
         return bottomPanel;
     }
 
@@ -162,10 +158,7 @@ public class MainFrame extends JFrame {
 
     private void updateTable() {
         tableModel.setRowCount(0);
-        if (itemSets == null) {
-            return;
-        }
-
+        if (itemSets == null) return;
         for (ItemSet set : itemSets) {
             tableModel.addRow(new Object[]{
                     set.getId(),
@@ -178,10 +171,7 @@ public class MainFrame extends JFrame {
     }
 
     private void updateChart() {
-        if (itemSets == null || itemSets.isEmpty()) {
-            return;
-        }
-
+        if (itemSets == null || itemSets.isEmpty()) return;
         chartPanel.removeAll();
         JPanel newChart = ChartGenerator.createScatterPlot(itemSets, "物品价值-重量分布图");
         chartPanel.add(newChart, BorderLayout.CENTER);
@@ -194,11 +184,10 @@ public class MainFrame extends JFrame {
             JOptionPane.showMessageDialog(this, "请先加载数据文件");
             return;
         }
-
         DKnapsackDP.sortByRatio(itemSets);
         updateTable();
-        updateChart();
-        resultArea.append("✓ 已按价值重量比非递增排序\n");
+        // 排序不改变散点图（保持原始数据分布）
+        resultArea.append("✓ 已按价值重量比非递增排序（表格已更新，散点图保持不变）\n");
     }
 
     private void solve() {
@@ -206,7 +195,6 @@ public class MainFrame extends JFrame {
             JOptionPane.showMessageDialog(this, "请先加载数据文件");
             return;
         }
-
         try {
             capacity = Integer.parseInt(txtCapacity.getText().trim());
             if (capacity <= 0) {
@@ -232,9 +220,7 @@ public class MainFrame extends JFrame {
             int idx = currentResult.getSelectedIndexes().get(i);
             int type = currentResult.getSelectedTypes().get(i);
             ItemSet set = itemSets.get(idx);
-
-            int weight = 0;
-            int value = 0;
+            int weight = 0, value = 0;
             switch (type) {
                 case 1:
                     weight = set.getWeight1();
@@ -263,17 +249,14 @@ public class MainFrame extends JFrame {
             JOptionPane.showMessageDialog(this, "请先求解后再导出");
             return;
         }
-
         JFileChooser fileChooser = new JFileChooser("./result");
         fileChooser.setCurrentDirectory(new File("result"));
-
         if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
             File file = fileChooser.getSelectedFile();
             String path = file.getAbsolutePath();
             if (!path.endsWith(".txt")) {
                 path += ".txt";
             }
-
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(path))) {
                 writer.write(resultArea.getText());
                 JOptionPane.showMessageDialog(this, "导出成功: " + path);
@@ -288,7 +271,6 @@ public class MainFrame extends JFrame {
             JOptionPane.showMessageDialog(this, "请先求解后再导出");
             return;
         }
-
         JFileChooser fileChooser = new JFileChooser("./result");
         if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
             File file = fileChooser.getSelectedFile();
@@ -296,39 +278,32 @@ public class MainFrame extends JFrame {
             if (!path.endsWith(".xlsx")) {
                 path += ".xlsx";
             }
-
-            try {
-                // 简单的Excel导出（使用CSV格式代替，避免POI复杂性）
-                try (PrintWriter writer = new PrintWriter(new FileWriter(path))) {
-                    writer.println("背包容量," + capacity);
-                    writer.println("最大总价值," + currentResult.getMaxValue());
-                    writer.println("求解耗时(ms)," + currentResult.getTimeMs());
-                    writer.println();
-                    writer.println("项集索引,选择的物品类型,重量,价值");
-
-                    for (int i = 0; i < currentResult.getSelectedIndexes().size(); i++) {
-                        int idx = currentResult.getSelectedIndexes().get(i);
-                        int type = currentResult.getSelectedTypes().get(i);
-                        ItemSet set = itemSets.get(idx);
-
-                        int weight = 0;
-                        int value = 0;
-                        switch (type) {
-                            case 1:
-                                weight = set.getWeight1();
-                                value = set.getValue1();
-                                break;
-                            case 2:
-                                weight = set.getWeight2();
-                                value = set.getValue2();
-                                break;
-                            case 3:
-                                weight = set.getWeight3();
-                                value = set.getValue3();
-                                break;
-                        }
-                        writer.println(idx + "," + type + "," + weight + "," + value);
+            try (PrintWriter writer = new PrintWriter(new FileWriter(path))) {
+                writer.println("背包容量," + capacity);
+                writer.println("最大总价值," + currentResult.getMaxValue());
+                writer.println("求解耗时(ms)," + currentResult.getTimeMs());
+                writer.println();
+                writer.println("项集索引,选择的物品类型,重量,价值");
+                for (int i = 0; i < currentResult.getSelectedIndexes().size(); i++) {
+                    int idx = currentResult.getSelectedIndexes().get(i);
+                    int type = currentResult.getSelectedTypes().get(i);
+                    ItemSet set = itemSets.get(idx);
+                    int weight = 0, value = 0;
+                    switch (type) {
+                        case 1:
+                            weight = set.getWeight1();
+                            value = set.getValue1();
+                            break;
+                        case 2:
+                            weight = set.getWeight2();
+                            value = set.getValue2();
+                            break;
+                        case 3:
+                            weight = set.getWeight3();
+                            value = set.getValue3();
+                            break;
                     }
+                    writer.println(idx + "," + type + "," + weight + "," + value);
                 }
                 JOptionPane.showMessageDialog(this, "导出成功: " + path);
             } catch (IOException e) {
